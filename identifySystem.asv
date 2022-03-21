@@ -1,0 +1,33 @@
+%%% Estimate the filter parameters
+
+%% Add data to path
+clc;clear;close
+addpath(genpath('Audio'));
+
+% Create data paths
+dataPath = "Audio/testSet";
+inputPath = strcat(dataPath,'/Muted/');
+outputPath = strcat(dataPath,'/Unmuted/');
+
+%%  Load Data
+% Make cells to store   
+[inputData,TsInput] = loadData(inputPath);
+[outputData,Tsoutput] = loadData(outputPath);
+
+%% Equalize measurements
+[chanOneData,chanTwoData] = dataPrep(inputData,outputData);
+
+%% Create matlab system
+chanOne = iddata(chanOneData{1},chanOneData{2},Tsoutput);
+chanTwo = iddata(chanTwoData{1},chanTwoData{2},Tsoutput);
+
+chanModel1 = impulseest(chanOne);
+chanModel2 = impulseest(chanTwo);
+
+%% Test model
+% Load all test data
+testPath = "Audio/validationSet/";
+[testData,TsTest] = loadData(testPath);
+
+% Get model parameters
+cha
