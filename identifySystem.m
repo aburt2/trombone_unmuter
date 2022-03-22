@@ -15,14 +15,21 @@ outputPath = strcat(dataPath,'/Unmuted/');
 [outputData,outputN, Tsoutput] = loadData(outputPath);
 
 %% Equalize measurements
-[chanOneData,chanTwoData] = dataPrep(inputData,outputData);
+clipSize = 2000;
+[chanOneData,chanTwoData,inputData,inputN,outputData,outputN] = dataPrep(inputData,inputN,outputData,outputN,clipSize);
 
 %% Create matlab system
 chanOne = iddata(chanOneData{1},chanOneData{2},Tsoutput);
 chanTwo = iddata(chanTwoData{1},chanTwoData{2},Tsoutput);
 
-chanModel1 = impulseest(chanOne);
-chanModel2 = impulseest(chanTwo);
+%% Estimate Impulse
+impulseModel1 = impulseest(chanOne);
+impulseModel2 = impulseest(chanTwo);
+
+%% Estimate Transfer Function
+np = 3;
+ssModel1 = ssest(chanOne,np);
+ssModel2 = ssest(chanTwo,np);
 
 %% Test model
 % Load all test data
@@ -30,28 +37,37 @@ testPath = "Audio/validationSet/";
 [testData,testN,TsTest] = loadData(testPath);
 
 % Get model parameters
-chanB1 = chanModel1.Numerator;
-chanA1 = chanModel1.Denominator;
-chanB2 = chanModel2.Numerator;
-chanA2 = chanModel2.Denominator;
+chanB1 = impulseModel1.Numerator;
+chanA1 = impulseModel1.Denominator;
+chanB2 = impulseModel2.Numerator;
+chanA2 = impulseModel2.Denominator;
 
-%% Filter Sound
+%% Save outputs
+savePath = 'Audio/Generated/Impulse/';
+fs = 1/TsTest{1};
+impulseData = saveImpulseSounds(testData,chanB1,chanA1,chanB2,chanA2,testN,fs,savePath);
+
+savePath = 'Audio/Generated/StateSpace/';
+fs = 1/TsTest{1};
+ssData = saveStateSounds(testData,ssModel1,ssModel2,testN,fs,savePath);
+
+%% Test Impulse Sounds
 idx = 9;
 mutedsound = testData{idx};
-fs = 1/TsTest{idx};
-unmutedsound1 = filter(chanB1,chanA1,mutedsound(:,1));
-unmutedsound2 = filter(chanB2,chanA2,mutedsound(:,2));
-
-% combine into single vector
-unmutedsound = [unmutedsound1 unmutedsound2];
+impulseSound = impulseData{idx};
+stateSound = ssData{idx};
+%% Plot three sounds
+subplot(3,1,1)
+plot(mutedsound)
+title('Muted Sound')
+subplot(3,1,2)
+plot(impulseSound)
+title('Impulse Model Prediction')
+subplot(3,1,3)
+plot(stateSound)
+title('State Space Model Predicition')
 
 %% Play sound
 soundsc(mutedsound,fs);
-soundsc(unmutedsound,fs);
-
-%% Save outputs
-savePath = 'Audio/Generated/';
-fs = 1/TsTest{1};
-saveSounds(testData,chanB1,chanA1,chanB2,chanA2,testN,fs,savePath)
-
-
+soundsc(impulseSound,fs);
+soundsc(stateSound,fs)
