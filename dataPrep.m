@@ -14,6 +14,9 @@ function [chanOneData,chanTwoData,inputData,inputN,outputData,outputN] = dataPre
     orderMap = containers.Map;
     for i = 1:length(inputN)
         idx = strfind(inputN{i},'-muted')-1;
+        if isempty(idx)
+            idx = strfind(inputN{i},'.wav')-1;
+        end
         inN{i} = inputN{i}(1:idx);
     end
     for n = 1:length(inputN)
