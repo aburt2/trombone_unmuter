@@ -4,17 +4,20 @@
 clc;clear;close
 addpath(genpath('Audio'));
 
-% Create data paths
+% Paths to audio
 dataPath = "Audio/chromaticSet";
-mutedPath = strcat(dataPath,'/Muted/');
-unmutedPath = strcat(dataPath,'/Unmuted/');
+mutedPath = strcat(dataPath,'/muted/');
+unmutedPath = strcat(dataPath,'/unmuted/');
+testPath = "Audio/validationSet/";
 
-%%  Load Data
+%  Load Data
 % Make cells to store   
 [mutedData, mutedN, TsInput] = loadData(mutedPath);
 [unmutedData,unmutedN, Tsoutput] = loadData(unmutedPath);
+[testData,testN,TsTest] = loadData(testPath);
+fs = 1./Tsoutput{1};
 
-%% Equalize measurements
+% Take clip of measurements
 clipSize = 4096;
 [chanOneData,chanTwoData,mutedClipData,mutedN,unmutedClipData,unmutedN] = dataPrep(mutedData,mutedN,unmutedData,unmutedN,clipSize);
 
@@ -28,11 +31,7 @@ chanOne = iddata(chanOneData{1},chanOneData{2},Tsoutput,'ExperimentName',experim
 chanTwo = iddata(chanTwoData{1},chanTwoData{2},Tsoutput,'ExperimentName',experimentName);
 
 %% Test model
-% Load all test data
-testPath = "Audio/validationSet/";
-[testData,testN,TsTest] = loadData(testPath);
-fs = 1./Tsoutput{1};
-
+% Split test data by note;
 Bbdata = getexp(chanOne,{'Bb'}); %4
 Bdata = getexp(chanOne,{'B'}); %3
 Cdata = getexp(chanOne,{'C'}); %6
@@ -58,24 +57,45 @@ dataMap = containers.Map({'Bb','B','C','Db','D','Eb','E','F','Gb','G','Ab','A','
 indexMap = containers.Map({'Bb','B','C','Db','D','Eb','E','F','Gb','G','Ab','A','Bboct','all'},{4,3,6,8,7,10,9,11,13,12,2,1,5,5});
 
 %% Undo effect of mute
-threshold = 1e-4;
 noteChoice = 'Bboct';
+output_sound = false;
+save_sound = false;
+
+% Get data
 data = dataMap(noteChoice);
 data_idx = indexMap(noteChoice);
 filter_input = mutedData{data_idx}(:,1);
 filter_output = unmutedData{data_idx}(:,1);
-tfEstimator = true;
 
-if tfEstimator
+%Estimator choice
+estimator = 'inverse';
+savepth = strcat('Audio/Generated/',estimator);
+
+%Transfer Estimator parameters
+tfnp = 40;
+tfnz = 20;
+tfopt = tfestOptions;
+tfopt.SearchOptions.MaxIterations = 100;
+
+%State Space Estimator parameters
+ssn = 3;
+ssopt = ssestOptions;
+ssopt.SearchOptions.MaxIterations = 100;
+
+%Inverse Filter parameters
+threshold = 1e-4;
+
+if strcmp(estimator,'tfestimator')
     udata = iddata([],filter_input,1/fs);
-    np = 40;
-    nz = 20;
-    opt = tfestOptions;
-    opt.SearchOptions.MaxIterations = 100;
-%     tfEstimate = tfest(data,np,nz,[],opt);
+    tfEstimate = tfest(data,tfnp,tfnz,[],tfopt);
     ysim = sim(tfEstimate,udata);
-    ysim = ysim.OutputData;    
-else
+    ysim = ysim.OutputData;
+elseif strcmp(estimator,'statespace')
+    udata = iddata([],filter_input,1/fs);
+    ssEstimate = ssest(data,ssn,ssopt);
+    ysim = sim(ssEstimate,udata);
+    ysim = ysim.OutputData;
+elseif strcmp(estimator,'inverse')
     % Take FFT of data
     X = fft(data.InputData); %muted
     Y = fft(data.OutputData); %unmuted
@@ -90,20 +110,28 @@ else
     h0 = [h ;zeros(zeroSize,1)];
     ysim = conv(filter_input,h0); %convolution
 end
-% soundsc(filter_output,fs)
-% pause(3)
-% soundsc(ysim,fs)
-yclip = ysim(floor(length(ysim)/2):floor(length(ysim)/2)+clipSize-1); %clip for fft;
-filename = strcat('Audio/Generated/transferfunction/',unmutedN{data_idx});
-audiowrite(filename,ysim,fs);
+% Output sound
+if output_sound
+    soundsc(filter_output,fs)
+    pause(3)
+    soundsc(ysim,fs)
+end
+% Save audio file
+if save_sound
+    filename = strcat(savepth,unmutedN{data_idx});
+    audiowrite(filename,ysim,fs);
+end
 %% Simulated the test pieces
-test_idx = 4;
+test_idx = 1;
 filter_input = testData{test_idx}(:,1);
-if tfEstimator
+if strcmp(estimator,'tfestimator')
     udata = iddata([],filter_input,1/fs);
     testsim = sim(tfEstimate,udata);
     testsim = testsim.OutputData;    
-else
+elseif strcmp(estimator,'statespace')
+    testsim = sim(ssEstimate,udata);
+    testsim = testsim.OutputData;
+elseif strcmp(estimator,'inverse')
     zeroSize = size(filter_input,1)-size(h,1);
     h0 = [h ;zeros(zeroSize,1)];
     testsim = conv(filter_input,h0); %convolution
@@ -112,6 +140,10 @@ soundsc(testsim,fs)
 filename = strcat('Audio/Generated/transferfunction/',testN{test_idx});
 audiowrite(filename,testsim,fs);
 %% Plot FFT
+%Clip simulated output for fft
+yclip = ysim(floor(length(ysim)/2):floor(length(ysim)/2)+clipSize-1); 
+
+%Plot all the graphs
 subplot(2,3,1)
 graphTitle1 = strcat("FFT of muted ",noteChoice);
 fftplot(data.InputData,fs,'mag',graphTitle1)
@@ -136,9 +168,9 @@ subplot(2,3,6)
 graphTitle3 = strcat("FFT of simulated unmuted ",noteChoice);
 fftplot(yclip,fs,'phase',graphTitle3)
 
-% Plot FFT of Impulse Response
-if ~tfEstimator
+% Plot FFT of inverse filter
+if strcmp(estimator,'inverse')
     figure
-    graphTitle4 = strcat("Impulse Response of signal of ",noteChoice);
+    graphTitle4 = strcat("Inverse filter frequency Response for ",noteChoice);
     fftplot(h,fs,'mag',graphTitle4)
 end
