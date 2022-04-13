@@ -137,7 +137,7 @@ elseif strcmp(estimator,'inverse')
     testsim = conv(filter_input,h0); %convolution
 end
 soundsc(testsim,fs)
-filename = strcat('Audio/Generated/transferfunction/',testN{test_idx});
+filename = strcat(savepth,testN{test_idx});
 audiowrite(filename,testsim,fs);
 %% Plot FFT
 %Clip simulated output for fft
