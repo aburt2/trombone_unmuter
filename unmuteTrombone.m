@@ -1,5 +1,24 @@
 function [unmutedSound,fs] = unmuteTrombone(mutedSound, fs,tromboneInfo,clipSize,w,olap,mix,outputSound,savePth,fileName,saveSound)
-%Unmute trombone sound given arguments
+    %%% Unmute trombone sound using addative synthesis given muted sound sample
+    % Inputs
+    %     mutedSound: array of a muted trombone sound
+    %     fs: sampling frequency
+    %     tromboneInfo: structure containing results of the analysis
+    %        freqValueRatioInfo: Container, with the ratios between frequency peaks
+    %        freqValueInfo: Container, with the frequency values of the maximum peaks
+    %        freqAmpMap: Container with the amplitude ratios between frequency peaks
+    %        freqAmpRatioInfo: Average amplitude ratios between frequency peaks
+    %        gain: average gain between unmuted and muted sounds
+    %     clipSize: window size
+    %     w: clipSizex1 array representing the window
+    %     olap: overlap between windows as a percentage
+    %     mix: ratio between muted sound and addative synthesis (mix = 1, means only the muted sound gets outputted)
+    %     outputSound: boolean used to determine if the sound is outputted
+    %     savePth: save location of the output sound
+    %     saveSound: boolean used to determine if the sound is saved
+    % Outputs
+    %   unmutedSound: array of the unmuted Sound
+    %   fs: sampling frequency
 
     %Unpack tromboneinfo
     freqAmpRatio = tromboneInfo.freqAmpRatioInfo;

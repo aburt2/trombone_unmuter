@@ -25,11 +25,11 @@ try
     %If the threshold has been changed run analyseSystem again
     if ((lastThreshold ~= threshold) || (lastFreqNum ~= freqnum)) || rerun
         fprintf('Updating model\n')
-        [tromboneInfo,lastThreshold,lastFreqNum] = analyseSystem(dataPath,'Audio',freqnum,threshold,linModelSpecs,saveModel);
+        [tromboneInfo,lastThreshold,lastFreqNum] = analyseSystem(dataPath,freqnum,threshold,linModelSpecs,saveModel);
     end
 catch ME
     fprintf('No saved model data detected running analyseSystem.m to create model\n')
-    [tromboneInfo,lastThreshold,lastFreqNum] = analyseSystem(dataPath,'Audio',freqnum,threshold,linModelSpecs,saveModel);
+    [tromboneInfo,lastThreshold,lastFreqNum] = analyseSystem(dataPath,freqnum,threshold,linModelSpecs,saveModel);
 end
 
 
@@ -40,7 +40,7 @@ pathArray = {testPath,mutedPath};
 % Specify Inputs
 outputSound = true;
 saveSound = false;
-mix = 0.05;
+mix = 0.03;
 clipSize = 4096;
 olap = 50;
 window = 'hann';
@@ -54,7 +54,7 @@ fileName = strcat('unMuted',inputfileName);
 
 %Run trombone sound through linear model (emphasises first harmonic)
 % Grab linear model if specified
-if (tromboneInfo.useLinear && preProcess)
+if tromboneInfo.useLinear
     fprintf('Passing sound through linear model\n')
     
     linModel = tromboneInfo.linModel;

@@ -1,8 +1,25 @@
-function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,AudioFolder,freqnum,threshold,linModelSpecs,saveModel)    
-%%% Estimate the filter parameters
-    % Add data to path
-    addpath(genpath(AudioFolder));
-    
+function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,freqnum,threshold,linModelSpecs,saveModel)      
+    %%% Analyses paired muted and unmuted trombone audio data and outputs parameters for unmuting algorithm for unmuteTrombone.m   
+    % Inputs
+    %     audioPath: Path to the parent folder where all your audio where your muted and unmuted audio is stored. Make sure that the muted and unmuted audio are stored in folders names muted and unmuted respectively
+    %     freqnum: Number of sinusoids you want to add for the additive synthesis
+    %     threshold: Minimum threshold value for peak detection
+    %     linModelSpecs: Structure containing information for linear model estimation
+    %        estimateLinear: boolean used to determine if linear model is estimated
+    %        estimator: type of linear model to estimate (ssestimator, or tfestimator)
+    %        maxIterations: maximum number of iterations MATLAB can use to estimate the model
+    %        order: order of the model (note higher orders require more time to estimate)
+    %     saveModel: boolean used to determine if you save the model info as a .mat file
+    % Outputs 
+    %     tromboneInfo: structure containing results of the analysis
+    %        freqValueRatioInfo: Container, with the ratios between frequency peaks
+    %        freqValueInfo: Container, with the frequency values of the maximum peaks
+    %        freqAmpMap: Container with the amplitude ratios between frequency peaks
+    %        freqAmpRatioInfo: Average amplitude ratios between frequency peaks
+    %        gain: average gain between unmuted and muted sounds
+    %     lastThreshold: threshold used for last run of the analyseSystem (used to automatically rerun the analysis if changed)
+    %     lastFreqNum: freqnum used for last run of the analyseSystem (used to automatically rerun the analysis if changed)
+
     % Paths to audio
     mutedPath = strcat(audioPath,'/muted/');
     unmutedPath = strcat(audioPath,'/unmuted/');

@@ -1,14 +1,22 @@
 function [chanOneData,chanTwoData,inputData,inputN,outputData,outputN] = dataPrep(inputData,inputN,outputData,outputN,clipSize)
-    %Makes each audioclip the same length
-    %   Detailed explanation goes here
+    %Makes each audioclip the same length, and stores channel one and two
+    %data in two data structures
+    %Inputs
+    %   inputData,outputData: cell array containing N stereo sound samples
+    %   inputN,outputN: cell array containing N names of the sound samples
+    %   clipSize: clipped size for experiment data
+    %Outputs   
+    %   chanOneData,chanTwoData: experiment data for channel one and two
+    %   inputData,outputData: cell array containing N stereo sound samples
+    %   inputN,outputN: cell array containing N names of the sound samples
     
     %check length of input and output data for each experiment is the same
     if (length(inputData) ~= length(outputData))
         error('Input and output data havce different lengths')
     end
 
-    % Order matrices so trials are in the right order
     %remove -muted from inputN
+    % Grab list of file names
     inN = cell(1,length(inputN));
     outN = cell(1,length(inputN));
     orderMap = containers.Map;
@@ -24,8 +32,9 @@ function [chanOneData,chanTwoData,inputData,inputN,outputData,outputN] = dataPre
         outN{n} = outputN{n}(1:idx);
         orderMap(outN{n}) = n;
     end
+
+    % Order matrices so trials are in the right order
     inMap = [];
-    outMap = [];
     for value = inN
         key = value{1};
         inMap = [inMap orderMap(key)];
@@ -39,6 +48,7 @@ function [chanOneData,chanTwoData,inputData,inputN,outputData,outputN] = dataPre
     chanTwoIn = cell(1,length(inputData));
     chanTwoOut = cell(1,length(inputData));
     
+    % Iterate through input and output to clip the data to the clipSize
     for k = 1:length(inputData)
         inSize = size(inputData{k},1);
         outSize = size(outputData{k},1);
@@ -50,6 +60,7 @@ function [chanOneData,chanTwoData,inputData,inputN,outputData,outputN] = dataPre
         %Take the middle of the note
         tmpIn = inputData{k}(floor(inSize/2):floor(inSize/2)+clipSize-1,:);
         tmpOut = outputData{k}(floor(outSize/2):floor(outSize/2)+clipSize-1,:);
+
         %Get input channel information
         chanOneIn{k} = tmpIn(:,1);
         chanTwoIn{k} = tmpIn(:,2);
