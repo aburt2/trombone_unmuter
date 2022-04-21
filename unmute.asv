@@ -5,14 +5,14 @@ testPath = "Audio/validationSet/";
 dataPath = "Audio/chromaticSet";
 mutedPath = strcat(dataPath,'/muted/');
 unmutedPath = strcat(dataPath,'/unmuted/');
-threshold = 1;
+threshold = 4;
 freqnum = 10; %Number of sinusoids to add
 saveModel = true;
 
 %Specify linear model
 % Supported Estimators: tfestimator, ssestimator, inverse
 % Note that large order models take a long time to estimate
-linModelSpecs = struct('estimateLinear',false, ...
+linModelSpecs = struct('estimateLinear',true, ...
                         'estimator', 'ssestimator', ...
                         'maxIterations',100, ...,
                         'order', 3);
@@ -41,12 +41,12 @@ pathArray = {testPath,mutedPath};
 outputSound = true;
 saveSound = false;
 mix = 0.05;
-clipSize = 4096;
+clipSize = 2048;
 olap = 50;
 window = 'hann';
 w = olaw('hann',clipSize);
 savePth = 'Audio/Generated/';
-preProcess = false;
+preProcess = true;
 
 % Get data
 [mutedSound,inputfileName, fs] = choosePiece(pathArray);
@@ -54,7 +54,7 @@ fileName = strcat('unMuted',inputfileName);
 
 %Run trombone sound through linear model (emphasises first harmonic)
 % Grab linear model if specified
-if (tromboneInfo.useLinear && preProcess)
+if tromboneInfo.useLinear
     fprintf('Passing sound through linear model\n')
     
     linModel = tromboneInfo.linModel;
@@ -62,7 +62,10 @@ if (tromboneInfo.useLinear && preProcess)
     udata = iddata([],mutedSound,1/fs);
 
     % Pass through linear model to emphasize first harmonic
-    if (strcmp(estimator,'tfestimator') || strcmp(estimator,'ssestimator'))
+    if strcmp(estimator,'tfestimator')
+        ysim = sim(linModel,udata);
+        processedMutedSound = ysim.OutputData;
+    elseif strcmp(estimator,'ssestimator')
         ysim = sim(linModel,udata);
         processedMutedSound = ysim.OutputData;
     elseif strcmp(estimator,'inverse')
@@ -73,10 +76,6 @@ if (tromboneInfo.useLinear && preProcess)
     end
 
     %Unmute the sound
-    [unmutedSound,fs] = unmuteTrombone(processedMutedSound,fs,tromboneInfo,clipSize,w,olap,mix,outputSound,savePth,fileName,saveSound);
-elseif preProcess
-    % TODO: add basic filter to remove noise
-    processedMutedSound = mutedSound;
     [unmutedSound,fs] = unmuteTrombone(processedMutedSound,fs,tromboneInfo,clipSize,w,olap,mix,outputSound,savePth,fileName,saveSound);
 else
     %Unmute the sound

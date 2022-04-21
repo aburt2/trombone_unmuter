@@ -19,7 +19,7 @@ function [unmutedSound,fs] = unmuteTrombone(mutedSound, fs,tromboneInfo,clipSize
     end
 
     % Initialize notePitch
-    noteFreq = 0;
+    notefreq = 0;
 
     %Unmute the sound
     for n = 1:nWindows
@@ -32,17 +32,8 @@ function [unmutedSound,fs] = unmuteTrombone(mutedSound, fs,tromboneInfo,clipSize
         yfft = yfft(1:floor((clipSize)/2-1)); % Clip fft
     
         % Identify the pitch
-        hr = harmonicRatio(slice,fs,Window=w,OverlapLength=hop);
-
-        if hr > 0.9
-            % Estimate pitch using matlab pitch function
-            noteFreq = pitch(slice,fs,Method='SRH',WindowLength=clipSize,OverlapLength=0);
-        elseif (noteFreq == 0)
-            % If the first sample is too noisy estimate by using maximum of
-            % FFT
-            [~,idx] = max(yfft);
-            noteFreq = f(idx)/2; 
-        end
+        hr = harmonicRatio(slice,fs,Window=clipSize,Overla)
+        noteFreq = pitch(slice,fs,Method='SRH',WindowLength=clipSize,OverlapLength=0);
 
         % Pull the information needed from containers
         harmRatio = 1:length(freqAmpRatio);

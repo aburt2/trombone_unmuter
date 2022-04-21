@@ -1,4 +1,4 @@
-function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,AudioFolder,freqnum,threshold,saveModel)    
+function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,AudioFolder,freqnum,threshold,linModelSpecs,saveModel)    
 %%% Estimate the filter parameters
     % Add data to path
     addpath(genpath(AudioFolder));
@@ -54,7 +54,58 @@ function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,Aud
     % Get notes from map
     notes = keys(dataMap);
     f = fs*(0:clipSize-1)/clipSize; %frequency range
-    
+
+    % If you want to estimate a linear model
+    if linModelSpecs.estimateLinear
+        fprintf('Estimating Linear model. Please Wait\n')
+        if strcmp(linModelSpecs.estimator,'tfestimator')
+            % Load model specs
+            tfnp = linModelSpecs.order;
+            tfnz = linModelSpecs.order;
+            
+            % Change number of maximum iterations
+            opt = tfestOptions;
+            opt.SearchOptions.MaxIterations = linModelSpecs.maxIterations;
+
+            % Estimate Model
+            linEstimate = tfest(chanOne,tfnp,tfnz,[],opt);
+
+            % Print model done
+            fprintf('Linear Model Estimatation Complete\n')
+        elseif strcmp(linModelSpecs.estimator,'ssestimator')
+            % Load model specs
+            nx = linModelSpecs.order;
+
+            %Change number of maximum iterations
+            opt = ssestOptions;
+            opt.SearchOptions.MaxIterations = linModelSpecs.maxIterations;
+
+            % Estimate model
+            linEstimate = ssest(chanOne,nx,opt);
+
+            % Print model done
+            fprintf('Linear Model Estimatation Complete\n')
+        elseif strcmp(linModelSpecs.estimator,'inverse')
+            % Take FFT of data
+            X = fft(chanOne.InputData{1}); %muted
+            Y = fft(chanOne.OutputData{1}); %unmuted
+
+            %Remove zeros/very small magnitudes from X
+            Xthresh = X;
+            inverseThresh = 1e-4;
+            Xthresh(abs(Xthresh)<inverseThresh) = inverseThresh;
+
+            % Solve for h
+            H = Y(2:end)./Xthresh(2:end);
+            linEstimate = real(ifft(H));
+
+            % Print model done
+            fprintf('Linear Model Estimatation Complete\n')
+        else
+            error('Invalid model specification %s',linModelSpecs.estimator)
+        end
+    end
+
     for n = 1:length(notes)
         key = notes{n}; %grab the note
         data = dataMap(key);
@@ -71,7 +122,7 @@ function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,Aud
         
         % Take FFT of unmuted data
         yfft = abs(fft(dif));
-        yfft = yfft(1:clipSize-1); % Clip fft
+        yfft = yfft(1:floor((clipSize)/2-1)); % Clip fft
     
         % Amplitude ratios
         idx = find(yfft(:,1)>threshold);
@@ -82,9 +133,10 @@ function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,Aud
             warning('Found less peaks than the specified number, consider lowering threshold')
         end
         amplitudes = yfft(idx);
-        [maxGain,fundIdx] = max(amplitudes);
+        [maxGain,~] = max(amplitudes);
         freqs = f(idx); %Frequencies of each cosine component as a ratio from the fundamental
-        freqsValueRatio = floor(freqs/f(fundIdx)); %Frequencies of each cosine component as a ratio from the fundamental
+        fundamentalFrequency = pitch(y,fs,WindowLength=clipSize,OverlapLength=0);
+        freqsValueRatio = round(freqs/fundamentalFrequency); %Frequencies of each cosine component as a ratio from the fundamental
         freqRatio = amplitudes/maxGain; %Amplitudes of each cosine component
 
         %Sort information in ascending order from fundamental frequency
@@ -102,7 +154,7 @@ function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,Aud
                 warning('Missing Harmonic Number %d',i)
             else
                 tmpIdx = find(sortedAmpRatio==tmp);
-                for k = 1:length(tmpIdx)
+                for k = 1:length(tmpIdx) % find index of the maximum amplitude for the harmonic
                     if any(tmpIdx(k) == searchRange)
                         uniqueIdx = [uniqueIdx tmpIdx(k)];
                     end
@@ -132,10 +184,16 @@ function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,Aud
         ampfreqInfo(n,:) = ampRatio(1:freqnum);
         gainInfo(n) = gain;
     end
-    
+    % Store frequency amplitude info within a cell
+    ampFreqCell = cell(1,length(notes));
+    for n = 1:length(ampFreqCell)
+        ampFreqCell{n} = ampfreqInfo(n,:);
+    end
+
     %Average information
     freqValueRatioMap = containers.Map(notes,freqValueRatioInfo); %ratio of frequency to the fundamental frequency
     freqValueMap = containers.Map(notes,freqInfo); %frequencie
+    freqAmpMap = containers.Map(notes,ampFreqCell); 
     freqAmpRatio = mean(ampfreqInfo,1); %ratio of frequency amplitudes
     avgGain = mean(gainInfo);
     
@@ -143,8 +201,19 @@ function [tromboneInfo, lastThreshold,lastFreqNum] = analyseSystem(audioPath,Aud
     tromboneInfo = struct('freqValueRatioInfo',freqValueRatioMap, ...
                       'freqValueInfo',freqValueMap, ...
                       'noteInfo',noteMap, ...
+                      'freqAmpMap',freqAmpMap, ...
                       'freqAmpRatioInfo',freqAmpRatio,...
                       'gain',avgGain);
+
+    % Add info if specified
+    if linModelSpecs.estimateLinear
+        tromboneInfo.linModel = linEstimate;
+        tromboneInfo.linModelSpec = linModelSpecs.estimator;
+        tromboneInfo.useLinear = true;
+    else
+        tromboneInfo.useLinear = false;
+    end
+
     % Store previous run info
     lastThreshold = threshold; 
     lastFreqNum = freqnum;
